@@ -23,6 +23,6 @@ With python installed, you will need to make a local copy of this code, you can 
 
 This program requires a few 3rd party python libraries, and as such need to be installed prior to running. In your command prompt (ideally having navigated to the folder where this project is located) type and use the following command (which may take a bit to complete).
 
-`pip install pytesseract scikit-image numpy tkinter pyautogui pynput`
+`pip install pytesseract scikit-image numpy tkinter pyautogui pynput opencv-python`
 
 Additionally you will need to install [tesseract](https://github.com/UB-Mannheim/tesseract/wiki) (5.0.0 alpha is recomended but 4.X should also work). Do keep in mind the path/folder where tesseract is installed on your computer. If it does *not* match `C:\Program Files\Tesseract-OCR\tesseract.exe`, you will need to put the proper path in gw2Read.py (with any text editor) right below the imports.

@@ -6,6 +6,7 @@ import re
 
 from tkinter import messagebox
 import pyautogui
+import cv2
 from pynput import mouse
 
 import time
@@ -90,12 +91,28 @@ class ChatFrame:
 
         return re.sub(regex, "", cleaned_string)
 
+    def auto_frame(self):
+        bl = pyautogui.locateOnScreen('./reference/bl_corner.png', confidence=0.9)
+        tr = pyautogui.locateOnScreen('./reference/tr_corner.png', confidence=0.9)
+
+        if bl is not None and tr is not None:
+            self.x1 = bl.left + bl.width / 2
+            self.y1 = bl.top
+
+            self.x2 = tr.left + tr.width / 2
+            # + because inverted schenanigans
+            self.y2 = tr.top + tr.height
+
+            return True
+        else:
+            return False
+
     def define_frame(self):
         # https://www.reddit.com/r/learnpython/comments/9f4lls/how_to_take_a_screenshot_of_a_specific_window/
         # https://pyautogui.readthedocs.io/en/latest/screenshot.html
 
         # Prompt user to click top left then top right of area
-        print('Please first click on the top left corner of the chat box, then the bottom right corner.')
+        print('Please first click on the bottom left corner of the chat box, then the top right corner.')
         with mouse.Listener(on_click=self.on_click) as listener:
             listener.join()
 
@@ -106,9 +123,9 @@ class ChatFrame:
 
     def take_screenshot(self):
         # the left, top, width, and height of the region to capture:
-        im = pyautogui.screenshot(region=(self.x1, self.y1,
+        im = pyautogui.screenshot(region=(self.x1, self.y2,
                                           self.x2 - self.x1,
-                                          self.y2 - self.y1))
+                                          self.y1 - self.y2))
         return im
 
     def on_click(self, x, y, button, pressed):
@@ -184,18 +201,29 @@ class ChatFrame:
 
     def validate_frame(self):
         if self.image:
+            p = None
             while True:
                 try:
-                    self.image.show()
+                    open_cv_image = np.array(self.image)
+                    # Convert RGB to BGR
+                    open_cv_image = open_cv_image[:, :, ::-1].copy()
+
+                    cv2.imshow('image', open_cv_image)
+
                 except SystemError as e:
-                    print('Improper frame format.')
-                    self.define_frame()
+                    print('Improper frame format.', e)
+                    if not myFrame.auto_frame():
+                        myFrame.define_frame()
                     self.image = myFrame.take_screenshot()
 
-                if messagebox.askyesno('Please Confirm', 'Is this valid?'):
+                #if messagebox.askyesno('Please Confirm', 'Is this valid?'):
+                response = pyautogui.confirm(text='Is this valid?', title='Please confirm',
+                                             buttons=['OK', 'Retry'])
+                cv2.destroyAllWindows()
+                if response == 'OK':
                     return True
                 else:
-                    self.define_frame()
+                    myFrame.define_frame()
                     self.image = myFrame.take_screenshot()
         else:
             return False
@@ -203,12 +231,11 @@ class ChatFrame:
 
 myFrame = ChatFrame()
 
-# Explore idea of auto finding chat box with pyautogui image find
-
-myFrame.define_frame()
+# If auto finding chat fails, prompt user to show it
+if not myFrame.auto_frame():
+    myFrame.define_frame()
 
 myFrame.image = myFrame.take_screenshot()
-
 if myFrame.validate_frame():
     myFrame.extract_text()
     myFrame.cycle_shots()
