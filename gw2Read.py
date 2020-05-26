@@ -74,17 +74,28 @@ class ChatFrame:
         return self.raw_text
 
     def sanitize_text(self, regex=None):
+        cleaned_string = self.raw_text
         if regex is None:
-            regex = r"[\{\[\(]?\d+:?\s*\d+\s*[AP]M\s*[I\]\)\}]?\s*"
+            # regex for time in 12h or 24h
+            # regex for channel tag [m], [s], etc
+            # [G], [G1/2/3/4/5], [S], [M], [T]
+            regex_tag = r"[\[\(\{]?\s*[GSMWTP][1-5]?\s*[\]\)\]]"
+            regex_time = r"[\[\(\{I]?\d+\s*:\s*\d+\s*[AP]?M?[\]\}\)I]?\s*"
+            regex_guild = r"[\[\(\{]?\s*[A-Za-z]{1-4}?\s*[\]\)\]]"
 
-        return re.sub(regex, "", self.raw_text)
+            cleaned_string = re.sub(regex_time, "", cleaned_string)
+            cleaned_string = re.sub(regex_tag, "", cleaned_string)
+            cleaned_string = re.sub(regex_guild, "", cleaned_string)
+            return cleaned_string
+
+        return re.sub(regex, "", cleaned_string)
 
     def define_frame(self):
         # https://www.reddit.com/r/learnpython/comments/9f4lls/how_to_take_a_screenshot_of_a_specific_window/
         # https://pyautogui.readthedocs.io/en/latest/screenshot.html
 
         # Prompt user to click top left then top right of area
-        print('Please first click on the top left corner of the chat box, the bottom right.')
+        print('Please first click on the top left corner of the chat box, then the bottom right corner.')
         with mouse.Listener(on_click=self.on_click) as listener:
             listener.join()
 

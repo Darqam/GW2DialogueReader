@@ -13,6 +13,8 @@ It is *Critical* that you run this program at the same level (or above) as GW2. 
 
 The obtained dialogue will be placed in the same folder as this program under `dialogue.txt` and the accompanying screenshots in the subfolder `screenshots\`. Though these are small images, if the program is used often, it might be worthwhile to clean these up regularly. At the moment these images serve only as a reference for the user, and have zero impact on the running program.
 
+Idealy this program should be run with the text font set to the biggest size, and the chatbox background set to opaque. You will get somewhat useable text without these, however optimal results will come from anything making the text clearer to read.
+
 Initial Install
 ------
 If you do not already have it, you will need to [download and install python](https://www.python.org/downloads/). To be certain it is installed properly (a computer restart may be necessary) open a command prompt and type `python --version`, this should return `Python 3.X.Y`.
