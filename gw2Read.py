@@ -63,19 +63,41 @@ class ChatFrame:
                 print('Could not create or find the folder {0}'.format(self.ss_folderpath))
                 quit()
 
+    def reset_frame(self):
+        self.x1 = 0
+        self.x2 = 0
+        self.y1 = 0
+        self.y2 = 0
+        self.width = 0
+        self.height = 0
+
     def get_frame(self):
         # Try to auto find the frame first
         self.auto_frame()
 
         # If auto finding chat fails, prompt user to show it
         while not self.valid_frame:
-            window = gw.getWindowsWithTitle("Guild Wars 2")[0]
-            if window:
-                window.minimize()
+            # create a black image, needed to pull focus of GW2 window
+            open_cv_image = np.zeros(shape=[512, 512, 3], dtype=np.uint8)
+            cv2.imshow('image', open_cv_image)
+
+            # Do some funky stuff to make the image popup above GW2 window
+            try:
+                window = gw.getWindowsWithTitle("image")[0]
+                if window:
+                    w_width = window.width
+                    w_height = window.height
+                    window.minimize()
+                    window.maximize()
+                    window.resizeTo(w_width, w_height)
+            except gw.PyGetWindowException as e:
+                print(e)
+
             response = pyautogui.confirm(text='Could not find the chat box automatically. Do you wish to retry on '
                                               'automatic mode or manual?',
                                          title='GW2 Read Error',
                                          buttons=['Automatic', 'Manual', 'Abort'])
+            cv2.destroyAllWindows()
             if response == 'Abort':
                 quit()
             elif response == 'Manual':
@@ -118,14 +140,15 @@ class ChatFrame:
         # https://pyautogui.readthedocs.io/en/latest/screenshot.html
 
         # Prompt user to click top left then top right of area
-        print('Please first click on the bottom left corner of the chat box, then the top right corner.')
+        pyautogui.confirm(text='Please click on the bottom left corner of the chat box, then the top right corner '
+                               'after dismissing this window.',
+                          title='GW2Transcriber info',
+                          buttons=['Ok'])
         with mouse.Listener(on_click=self.on_click) as listener:
             listener.join()
 
         with mouse.Listener(on_click=self.on_click) as listener:
             listener.join()
-
-        print('Coordinates grabbed, thank you')
 
     def on_click(self, x, y, button, pressed):
         if self.x1 != 0 and self.x2 == 0 and pressed:
@@ -163,18 +186,30 @@ class ChatFrame:
                         print(e)
                 except SystemError as e:
                     print('Improper frame format.', e)
-                    if not myFrame.auto_frame():
-                        myFrame.get_frame()
-                    self.image = myFrame.take_screenshot()
+                    if not self.auto_frame():
+                        self.get_frame()
+                    self.image = self.take_screenshot()
 
-                response = pyautogui.confirm(text='Is this valid?', title='Please confirm',
-                                             buttons=['OK', 'Retry'])
+                response = pyautogui.confirm(text='Does this image show the full text area of the chat box',
+                                             title='Please confirm',
+                                             buttons=['OK', 'Retry auto', 'Try Manual', 'Quit'])
                 cv2.destroyAllWindows()
                 if response == 'OK':
                     return True
-                else:
-                    myFrame.get_frame()
-                    self.image = myFrame.take_screenshot()
+                elif response == 'Retry auto':
+                    pyautogui.confirm(text='Please ensure that the chat box is up and in opaque mode before dismissing '
+                                           'this window',
+                                      title='GW2 Read Error',
+                                      buttons=['Ok'])
+                    self.reset_frame()
+                    self.get_frame()
+                    self.image = self.take_screenshot()
+                elif response == 'Try Manual':
+                    self.reset_frame()
+                    self.manual_frame()
+                    self.image = self.take_screenshot()
+                elif response == 'Quit':
+                    quit()
         else:
             return False
 
@@ -198,7 +233,6 @@ class ChatFrame:
         thresh_otsu = gray > threshold_otsu(gray)
 
         self.raw_text = pytesseract.image_to_string(thresh_otsu).replace('\n\n', '\n')
-        # print(self.raw_text)
         return self.raw_text
 
     def sanitize_text(self, regex=None):
@@ -208,7 +242,7 @@ class ChatFrame:
             # regex for channel tag [m], [s], etc
             # [G], [G1/2/3/4/5], [S], [M], [T]
             regex_tag = r"[\[\(\{]?\s*[GSMWTP][1-5]?\s*[\]\)\]]"
-            regex_time = r"[\[\(\{I]?\d+\s*:\s*\d+\s*[AP]?M?[\]\}\)I]?\s*"
+            regex_time = r"[\[\(\{I]?\d{1,3}\s*[:\.\,]?\s*\d{1,3}\s*[AP]?M?[\]\}\)I]?\s*"
             regex_guild = r"[\[\(\{]?\s*[A-Za-z]{1-4}?\s*[\]\)\]]"
 
             cleaned_string = re.sub(regex_time, "", cleaned_string)
@@ -275,7 +309,7 @@ class ChatFrame:
 
     def save_screenshot(self):
         cur_date = datetime.datetime.fromtimestamp(time.time())
-        filename = '{0}{1}.jpg'.format(myFrame.ss_folderpath, cur_date.strftime('%Y-%m-%d_%H-%M-%S'))
+        filename = '{0}{1}.jpg'.format(self.ss_folderpath, cur_date.strftime('%Y-%m-%d_%H-%M-%S'))
         self.image.save(filename)
 
 
