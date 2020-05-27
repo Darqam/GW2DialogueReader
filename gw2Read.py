@@ -63,39 +63,6 @@ class ChatFrame:
                 print('Could not create or find the folder {0}'.format(self.ss_folderpath))
                 quit()
 
-    def extract_text(self):
-        # https://tesseract-ocr.github.io/tessdoc/ImproveQuality
-
-        # First convert image to numpy array
-        img = np.array(self.image)
-
-        # Convert to grayscale and invert (to get black text on white bckg)
-        gray = skimage.util.invert(skimage.color.rgb2gray(img))
-
-        # Use Otsu thresholding and convert to binary
-        thresh_otsu = gray > threshold_otsu(gray)
-
-        self.raw_text = pytesseract.image_to_string(thresh_otsu).replace('\n\n', '\n')
-        # print(self.raw_text)
-        return self.raw_text
-
-    def sanitize_text(self, regex=None):
-        cleaned_string = self.raw_text
-        if regex is None:
-            # regex for time in 12h or 24h
-            # regex for channel tag [m], [s], etc
-            # [G], [G1/2/3/4/5], [S], [M], [T]
-            regex_tag = r"[\[\(\{]?\s*[GSMWTP][1-5]?\s*[\]\)\]]"
-            regex_time = r"[\[\(\{I]?\d+\s*:\s*\d+\s*[AP]?M?[\]\}\)I]?\s*"
-            regex_guild = r"[\[\(\{]?\s*[A-Za-z]{1-4}?\s*[\]\)\]]"
-
-            cleaned_string = re.sub(regex_time, "", cleaned_string)
-            cleaned_string = re.sub(regex_tag, "", cleaned_string)
-            cleaned_string = re.sub(regex_guild, "", cleaned_string)
-            return cleaned_string
-
-        return re.sub(regex, "", cleaned_string)
-
     def get_frame(self):
         # Try to auto find the frame first
         self.auto_frame()
@@ -217,6 +184,39 @@ class ChatFrame:
                                           self.width,
                                           self.height))
         return im
+
+    def extract_text(self):
+        # https://tesseract-ocr.github.io/tessdoc/ImproveQuality
+
+        # First convert image to numpy array
+        img = np.array(self.image)
+
+        # Convert to grayscale and invert (to get black text on white bckg)
+        gray = skimage.util.invert(skimage.color.rgb2gray(img))
+
+        # Use Otsu thresholding and convert to binary
+        thresh_otsu = gray > threshold_otsu(gray)
+
+        self.raw_text = pytesseract.image_to_string(thresh_otsu).replace('\n\n', '\n')
+        # print(self.raw_text)
+        return self.raw_text
+
+    def sanitize_text(self, regex=None):
+        cleaned_string = self.raw_text
+        if regex is None:
+            # regex for time in 12h or 24h
+            # regex for channel tag [m], [s], etc
+            # [G], [G1/2/3/4/5], [S], [M], [T]
+            regex_tag = r"[\[\(\{]?\s*[GSMWTP][1-5]?\s*[\]\)\]]"
+            regex_time = r"[\[\(\{I]?\d+\s*:\s*\d+\s*[AP]?M?[\]\}\)I]?\s*"
+            regex_guild = r"[\[\(\{]?\s*[A-Za-z]{1-4}?\s*[\]\)\]]"
+
+            cleaned_string = re.sub(regex_time, "", cleaned_string)
+            cleaned_string = re.sub(regex_tag, "", cleaned_string)
+            cleaned_string = re.sub(regex_guild, "", cleaned_string)
+            return cleaned_string
+
+        return re.sub(regex, "", cleaned_string)
 
     def cycle_shots(self, timer=10):
         while True:
