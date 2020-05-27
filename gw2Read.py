@@ -286,6 +286,8 @@ myFrame.image = myFrame.take_screenshot()
 
 if myFrame.image:
     myFrame.validate_frame()
+    pyautogui.confirm(text='Ok, let\'s go.', title='Eyy',
+                      buttons=['*push the button*'])
     myFrame.extract_text()
     myFrame.cycle_shots()
 else:
