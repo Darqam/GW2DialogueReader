@@ -1,4 +1,4 @@
-GW2 Dialogue Reader
+GW2 Transcriber
 ==========
 
 Acts as a live writting tool to bring the text inside the chatbox (or the designated area) into a txt file along with screenshots of the dialogue.
