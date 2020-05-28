@@ -21,7 +21,7 @@ pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tessera
 
 class ChatFrame:
     """
-    Information pertaining to the chat box frame and examination of
+    Class describing the virtual GW2 chatbox position, image, and content
     """
     def __init__(self):
         self.x1 = 0
@@ -56,12 +56,14 @@ class ChatFrame:
         self.new_file_entry()
 
     def new_file_entry(self):
+        """Adds a datetime header to the dialogue file."""
         with open(self.d_filepath, 'a') as file:
             cur_date = datetime.datetime.fromtimestamp(time.time())
             file.write('\n\n---{0}---\n'.format(cur_date.strftime('%Y-%m-%d %H:%M:%S')))
             self.last_entry_time = time.time()
 
     def verify_folder(self):
+        """Verifies that screenshot folder exists, if not attempts to create it."""
         if not path.isdir(self.ss_folderpath):
             try:
                 mkdir(self.ss_folderpath)
@@ -70,6 +72,7 @@ class ChatFrame:
                 quit()
 
     def reset_frame(self):
+        """Resets all frame related coordinates to 0."""
         self.x1 = 0
         self.x2 = 0
         self.y1 = 0
@@ -78,6 +81,7 @@ class ChatFrame:
         self.height = 0
 
     def get_frame(self):
+        """Will attempt to grab the frame automatically, if fails prompts user for further instructions."""
         # Try to auto find the frame first
         self.auto_frame()
 
@@ -119,6 +123,9 @@ class ChatFrame:
                 self.valid_frame = True
 
     def auto_frame(self):
+        """Will attempt to automatically find the GW2 chatbox based on two reference images.
+        If found, will set appropriate frame information."""
+
         window = gw.getWindowsWithTitle("Guild Wars 2")[0]
         if window:
             window.maximize()
@@ -142,6 +149,7 @@ class ChatFrame:
             self.height = 0
 
     def manual_frame(self):
+        """Prompts user, then creates 2 subsequent listeners for click events (see on_click())."""
         # https://www.reddit.com/r/learnpython/comments/9f4lls/how_to_take_a_screenshot_of_a_specific_window/
         # https://pyautogui.readthedocs.io/en/latest/screenshot.html
 
@@ -157,6 +165,8 @@ class ChatFrame:
             listener.join()
 
     def on_click(self, x, y, button, pressed):
+        """Will trigger from click events in manual_frame(). It will set frame coordinates assuming
+        the first click is the bottom left of the chat box, and 2nd top right."""
         if self.x1 != 0 and self.x2 == 0 and pressed:
             self.x2 = x
             self.y2 = y
@@ -171,6 +181,8 @@ class ChatFrame:
             return False
 
     def validate_frame(self):
+        """Presents the grabbed frame as an image to the user and prompts for confirmation if
+        the image shows the proper chat box. If this is not satisfied, prompts for further action."""
         if self.image:
             while True:
                 try:
@@ -198,12 +210,15 @@ class ChatFrame:
 
                 response = pyautogui.confirm(text='Does this image show the full text area of the chat box',
                                              title='Please confirm',
-                                             buttons=['OK', 'Retry auto', 'Try Manual', 'Quit'])
+                                             buttons=['Yes', 'Retry auto', 'Try Manual', 'Quit'])
                 cv2.destroyAllWindows()
-                if response == 'OK':
+                if response == 'Yes':
                     return True
                 elif response == 'Retry auto':
-                    pyautogui.confirm(text='Please ensure that the chat box is up and in opaque mode before dismissing '
+                    # Reduce required confidence level on each retry
+                    self.confidence_level -= 0.05
+
+                    pyautogui.confirm(text='Please ensure that the chat box is up and in opaque mode before dismissing'
                                            'this window',
                                       title='GW2 Read Error',
                                       buttons=['Ok'])
@@ -220,6 +235,7 @@ class ChatFrame:
             return False
 
     def take_screenshot(self):
+        """Will take a screenshot based on saved frame coordinates"""
         # the left, top, width, and height of the region to capture:
         im = pyautogui.screenshot(region=(self.x1, self.y2,
                                           self.width,
@@ -227,6 +243,10 @@ class ChatFrame:
         return im
 
     def extract_text(self):
+        """
+        Grabs the stored image, optimizes image for OCR and runs it through tesseract.
+        :return: [string] The raw text string outputed by Tesseract
+        """
         # https://tesseract-ocr.github.io/tessdoc/ImproveQuality
 
         # First convert image to numpy array
@@ -242,6 +262,12 @@ class ChatFrame:
         return self.raw_text
 
     def cycle_shots(self, timer=10):
+        """
+        Endless loop which calls for screenshot and text extraction+cleanup
+        Will verify there is new text grabbed in the latest image
+        If not, continue on, if yes then print to file and save screenshot
+        :param timer: The delay between read intervals (in seconds)
+        """
         while True:
             self.image = self.take_screenshot()
 
@@ -292,6 +318,10 @@ class ChatFrame:
             time.sleep(timer)
 
     def print_to_file(self, lines=None):
+        """
+        Will print the provided lines to the appropriate dialogue text file
+        :param lines: a list of strings, text to be written to the file
+        """
         if lines is None:
             return
 
@@ -300,6 +330,7 @@ class ChatFrame:
             file.write('\n'.join(lines))
 
     def save_screenshot(self):
+        """Saves the screenshot of the chat frame with a datetime filename."""
         cur_date = datetime.datetime.fromtimestamp(time.time())
         filename = '{0}{1}.jpg'.format(self.ss_folderpath, cur_date.strftime('%Y-%m-%d_%H-%M-%S'))
         self.image.save(filename)
