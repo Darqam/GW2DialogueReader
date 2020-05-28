@@ -7,9 +7,14 @@ The process is performed through [Tesseract OCR](https://github.com/tesseract-oc
 
 Usage
 -----
-
+* First, ensure you have followed all the install instructions in the below section
 * Log into a GW2 character and set the chatbox to opaque
-* Start this program in a console with `python gw2Read.py`, follow the prompts.
+* Open a command prompt
+    * windows button -> type 'cmd' -> click on `open` or `run as administrator` (see comment below)
+* Navigate to the folder for this program
+    * type `cd \path\to\this\folder` in the command prompt
+* Start this program in a console\cmd with `python gw2Read.py`, follow the prompts.
+    * Depending on your install it may be `py gw2Read.py` or whatever other python keyword you have set
 
 It is *Critical* that you run this program at the same level (or above) as GW2. If GW2 is running in administrator mode, then so should this program. A program running in non-admin mode will not be able to grab input given in one in administrator mode.
 
@@ -28,6 +33,7 @@ This program requires a few 3rd party python libraries, and as such need to be i
 ```
 pip install pytesseract scikit-image numpy tkinter pyautogui pynput opencv-python pygetwindow
 ```
+Note that it's possible you get warnings along the lines of "requirement already satisfied [...]", that's in no way a problem just means that library is already installed.
 
 Additionally you will need to install [tesseract](https://github.com/UB-Mannheim/tesseract/wiki) (5.0.0 alpha is recomended but 4.X should also work). Do keep in mind the path/folder where tesseract is installed on your computer. If it does *not* match `C:\Program Files\Tesseract-OCR\tesseract.exe`, you will need to put the proper path in gw2Read.py (with any text editor) right below the imports.
 
