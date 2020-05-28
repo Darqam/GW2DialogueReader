@@ -30,3 +30,9 @@ pip install pytesseract scikit-image numpy tkinter pyautogui pynput opencv-pytho
 ```
 
 Additionally you will need to install [tesseract](https://github.com/UB-Mannheim/tesseract/wiki) (5.0.0 alpha is recomended but 4.X should also work). Do keep in mind the path/folder where tesseract is installed on your computer. If it does *not* match `C:\Program Files\Tesseract-OCR\tesseract.exe`, you will need to put the proper path in gw2Read.py (with any text editor) right below the imports.
+
+Todo
+-----
+* Make a nice way to pause and stop the program through keyboard shortcuts (user customizable)
+* Do some more text parsing
+    * Probably move it into another module and allow for user regex additions
