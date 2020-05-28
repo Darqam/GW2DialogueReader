@@ -13,6 +13,8 @@ import time
 import datetime
 from os import path, mkdir
 
+from clean_output import clean
+
 # Give explicit path to tesseract exe
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
@@ -39,6 +41,10 @@ class ChatFrame:
         self.last_content = None
         self.last_line = None
         self.last_entry_time = None
+
+        # If the user wants to make use of custom regex, make custom_regexs a list of tuples
+        # The first entry in the tuple being the `find` and the 2nd the `replace` strings
+        self.custom_regexs = None
 
         self.d_filepath = './dialogue.txt'
         self.ss_folderpath = './screenshots/'
@@ -235,29 +241,15 @@ class ChatFrame:
         self.raw_text = pytesseract.image_to_string(thresh_otsu).replace('\n\n', '\n')
         return self.raw_text
 
-    def sanitize_text(self, regex=None):
-        cleaned_string = self.raw_text
-        if regex is None:
-            # regex for time in 12h or 24h
-            # regex for channel tag [m], [s], etc
-            # [G], [G1/2/3/4/5], [S], [M], [T]
-            regex_tag = r"[\[\(\{]?\s*[GSMWTP][1-5]?\s*[\]\)\]]"
-            regex_time = r"[\[\(\{I]?\d{1,3}\s*[:\.\,]?\s*\d{1,3}\s*[AP]?M?[\]\}\)I]?\s*"
-            regex_guild = r"[\[\(\{]?\s*[A-Za-z]{1-4}?\s*[\]\)\]]"
-
-            cleaned_string = re.sub(regex_time, "", cleaned_string)
-            cleaned_string = re.sub(regex_tag, "", cleaned_string)
-            cleaned_string = re.sub(regex_guild, "", cleaned_string)
-            return cleaned_string
-
-        return re.sub(regex, "", cleaned_string)
-
     def cycle_shots(self, timer=10):
         while True:
             self.image = self.take_screenshot()
 
             self.extract_text()
-            out = self.sanitize_text()
+            out = clean(self.raw_text, use_defaults=True, custom=self.custom_regexs)
+
+            if out is False:
+                out = self.raw_text
 
             lines = out.split('\n')
             last_line = lines[-1]
