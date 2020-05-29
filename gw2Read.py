@@ -2,17 +2,22 @@ import pytesseract
 import skimage
 from skimage.filters import threshold_otsu
 import numpy as np
-import re
+
+# These imports are explicit purely for exe purposes
+import numpy.random.common
+import numpy.random.bounded_integers
 
 import pyautogui
 import pygetwindow as gw
 import cv2
-from pynput import mouse
+from pynput import mouse, keyboard
 
 import time
 import datetime
 from os import path, mkdir
+import sys
 
+# Custom module
 from clean_output import clean
 
 # Give explicit path to tesseract exe
@@ -67,9 +72,12 @@ class ChatFrame:
         if not path.isdir(self.ss_folderpath):
             try:
                 mkdir(self.ss_folderpath)
-            except:
-                print('Could not create or find the folder {0}'.format(self.ss_folderpath))
-                quit()
+            except Exception as err:
+                pyautogui.alert(text='Could not create or find the folder {0}, aborting.'.format(self.ss_folderpath),
+                                title='Error',
+                                button='OK')
+                print(err)
+                sys.exit(1)
 
     def reset_frame(self):
         """Resets all frame related coordinates to 0."""
@@ -109,7 +117,7 @@ class ChatFrame:
                                          buttons=['Automatic', 'Manual', 'Abort'])
             cv2.destroyAllWindows()
             if response == 'Abort':
-                quit()
+                sys.exit(0)
             elif response == 'Manual':
                 self.manual_frame()
             elif response == 'Automatic':
@@ -126,10 +134,15 @@ class ChatFrame:
         """Will attempt to automatically find the GW2 chatbox based on two reference images.
         If found, will set appropriate frame information."""
 
-        window = gw.getWindowsWithTitle("Guild Wars 2")[0]
-        if window:
-            window.maximize()
-            window.activate()
+        try:
+            window = gw.getWindowsWithTitle("Guild Wars 2")[0]
+            if window:
+                window.maximize()
+                window.activate()
+        except IndexError as e:
+            pyautogui.alert(text='Could not find a window titled "Guild Wars 2", aborting.', title='Error',
+                            button='OK')
+            sys.exit(1)
 
         bl = pyautogui.locateOnScreen('./reference/bl_corner.png', confidence=self.confidence_level)
         tr = pyautogui.locateOnScreen('./reference/tr_corner.png', confidence=self.confidence_level)
@@ -230,7 +243,7 @@ class ChatFrame:
                     self.manual_frame()
                     self.image = self.take_screenshot()
                 elif response == 'Quit':
-                    quit()
+                    sys.exit(0)
         else:
             return False
 
@@ -337,16 +350,22 @@ class ChatFrame:
 
 
 myFrame = ChatFrame()
-
-myFrame.get_frame()
-myFrame.image = myFrame.take_screenshot()
+try:
+    myFrame.get_frame()
+    myFrame.image = myFrame.take_screenshot()
+except Exception as e:
+    print(e)
 
 if myFrame.image:
     myFrame.validate_frame()
     pyautogui.confirm(text='Ok, let\'s go.', title='Eyy',
                       buttons=['*push the button*'])
     myFrame.extract_text()
+
+    #stop_listener = keyboard.Listener()
+
     myFrame.cycle_shots()
 else:
-    print('There was an issue determining the frame or image.')
-    quit()
+    pyautogui.alert(text='There was an issue determining the frame or image, aborting.', title='Error',
+                    button='OK')
+    sys.exit(1)
