@@ -1,5 +1,8 @@
 .idea/
 venv/
+_pycache_/
+build/
+*.spec
 
 dialogue.txt
 screenshots/

@@ -2,23 +2,40 @@ import pytesseract
 import skimage
 from skimage.filters import threshold_otsu
 import numpy as np
-import re
+
+# These imports are explicit purely for exe purposes
+import numpy.random.common
+import numpy.random.bounded_integers
 
 import pyautogui
 import pygetwindow as gw
 import cv2
-from pynput import mouse
+from pynput import mouse, keyboard
+
+import yaml
+from pathlib import Path
 
 import time
 import datetime
-from os import path, mkdir
+from os import path, mkdir, sep
+import sys
 
+# Custom module
 from clean_output import clean
 
-# Give explicit path to tesseract exe
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+
+# Tiny bit of work to allow loading tupples from yaml
+class PrettySafeLoader(yaml.SafeLoader):
+    def construct_python_tuple(self, node):
+        return tuple(self.construct_sequence(node))
 
 
+PrettySafeLoader.add_constructor(
+    u'tag:yaml.org,2002:python/tuple',
+    PrettySafeLoader.construct_python_tuple)
+
+
+# Now to the core of it all
 class ChatFrame:
     """
     Class describing the virtual GW2 chatbox position, image, and content
@@ -45,15 +62,43 @@ class ChatFrame:
         # If the user wants to make use of custom regex, make custom_regexs a list of tuples
         # The first entry in the tuple being the `find` and the 2nd the `replace` strings
         self.custom_regexs = None
+        self.use_default_regex = True
 
-        self.d_filepath = './dialogue.txt'
-        self.ss_folderpath = './screenshots/'
+        self.d_filepath = f"{Path('./dialogue.txt')}"
+        self.ss_folderpath = f"{Path('./screenshots/')}{sep}"
         self.header_interval_time = 300  # in seconds
+        self.read_interval = 10
+        self.tesseract_filepath = f"{Path('C:/Program Files/Tesseract-OCR/tesseract.exe')}"
 
+        # Load user configs
+        self.load_configs()
         # Make sure we have a valid screenshots folder
         self.verify_folder()
         # Make a new entry in the dialogue txt file
         self.new_file_entry()
+
+    def load_configs(self):
+        with open(Path("./config.yaml"), 'r') as stream:
+            try:
+                config = yaml.load(stream, Loader=PrettySafeLoader)
+                self.d_filepath = Path(config['dialogue_filepath'])
+                self.ss_folderpath = f"{Path(config['screenshot_folderpath'])}{sep}"
+                self.header_interval_time = config['time_header_interval']
+                self.read_interval = config['read_interval']
+                self.tesseract_filepath = f"{Path(config['tesseract_filepath'])}"
+                self.confidence_level = config['confidence_level']
+                self.custom_regexs = config['user_regex']
+                self.use_default_regex = config['use_default_regex']
+
+                # Give explicit path to tesseract exe
+                pytesseract.pytesseract.tesseract_cmd = self.tesseract_filepath
+            except yaml.YAMLError as exc:
+                print(exc)
+                pyautogui.alert(text='There was an error loading config.yaml, please ensure it is filled out '
+                                     'properly, aborting.',
+                                title='Error',
+                                button='OK')
+                sys.exit(1)
 
     def new_file_entry(self):
         """Adds a datetime header to the dialogue file."""
@@ -67,9 +112,12 @@ class ChatFrame:
         if not path.isdir(self.ss_folderpath):
             try:
                 mkdir(self.ss_folderpath)
-            except:
-                print('Could not create or find the folder {0}'.format(self.ss_folderpath))
-                quit()
+            except Exception as err:
+                print(err)
+                pyautogui.alert(text='Could not create or find the folder {0}, aborting.'.format(self.ss_folderpath),
+                                title='Error',
+                                button='OK')
+                sys.exit(1)
 
     def reset_frame(self):
         """Resets all frame related coordinates to 0."""
@@ -109,7 +157,7 @@ class ChatFrame:
                                          buttons=['Automatic', 'Manual', 'Abort'])
             cv2.destroyAllWindows()
             if response == 'Abort':
-                quit()
+                sys.exit(0)
             elif response == 'Manual':
                 self.manual_frame()
             elif response == 'Automatic':
@@ -126,10 +174,19 @@ class ChatFrame:
         """Will attempt to automatically find the GW2 chatbox based on two reference images.
         If found, will set appropriate frame information."""
 
-        window = gw.getWindowsWithTitle("Guild Wars 2")[0]
-        if window:
-            window.maximize()
-            window.activate()
+        try:
+            window = gw.getWindowsWithTitle("Guild Wars 2")[0]
+            if window:
+                window.maximize()
+                window.activate()
+        except IndexError as e:
+            pyautogui.alert(text='Could not find a window titled "Guild Wars 2", aborting.', title='Error',
+                            button='OK')
+            sys.exit(1)
+
+        # wait 0.5 seconds for the window to actually be in frame
+        # failing to do this can result in just a black box
+        time.sleep(0.5)
 
         bl = pyautogui.locateOnScreen('./reference/bl_corner.png', confidence=self.confidence_level)
         tr = pyautogui.locateOnScreen('./reference/tr_corner.png', confidence=self.confidence_level)
@@ -230,7 +287,7 @@ class ChatFrame:
                     self.manual_frame()
                     self.image = self.take_screenshot()
                 elif response == 'Quit':
-                    quit()
+                    sys.exit(0)
         else:
             return False
 
@@ -272,7 +329,7 @@ class ChatFrame:
             self.image = self.take_screenshot()
 
             self.extract_text()
-            out = clean(self.raw_text, use_defaults=True, custom=self.custom_regexs)
+            out = clean(self.raw_text, use_defaults=self.use_default_regex, custom=self.custom_regexs)
 
             if out is False:
                 out = self.raw_text
@@ -337,16 +394,22 @@ class ChatFrame:
 
 
 myFrame = ChatFrame()
-
-myFrame.get_frame()
-myFrame.image = myFrame.take_screenshot()
+try:
+    myFrame.get_frame()
+    myFrame.image = myFrame.take_screenshot()
+except Exception as e:
+    print(e)
 
 if myFrame.image:
     myFrame.validate_frame()
     pyautogui.confirm(text='Ok, let\'s go.', title='Eyy',
                       buttons=['*push the button*'])
     myFrame.extract_text()
+
+    #stop_listener = keyboard.Listener()
+
     myFrame.cycle_shots()
 else:
-    print('There was an issue determining the frame or image.')
-    quit()
+    pyautogui.alert(text='There was an issue determining the frame or image, aborting.', title='Error',
+                    button='OK')
+    sys.exit(1)

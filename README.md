@@ -31,7 +31,7 @@ With python installed, you will need to make a local copy of this code, you can 
 This program requires a few 3rd party python libraries, and as such need to be installed prior to running. In your command prompt (ideally having navigated to the folder where this project is located) type and use the following command (which may take a bit to complete).
 
 ```
-pip install pytesseract scikit-image numpy tkinter pyautogui pynput opencv-python pygetwindow
+pip install pathlib pyyaml pytesseract scikit-image numpy pyautogui pynput opencv-python pygetwindow
 ```
 Note that it's possible you get warnings along the lines of "requirement already satisfied [...]", that's in no way a problem just means that library is already installed.
 
