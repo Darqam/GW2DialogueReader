@@ -16,7 +16,9 @@
   #  0.7-0.8 is usually ok, lower may lead to improper matching
   confidence_level: 0.8
 
+  use_default_regex: True
   # Extra regex to use when parsing text
   # This should be an array of tuples, the first entry being the target, 2nd the replace
   # user_regex: [ !!python/tuple ['(fo)o','\1'], !!python/tuple ['bar', 'foo'] ]
+  # This regex removes a newline if the next line doesn't have a `:` in it
   user_regex: [ !!python/tuple ['\n(?!.+:)([^\n].+)','\1'] ]

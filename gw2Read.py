@@ -62,12 +62,13 @@ class ChatFrame:
         # If the user wants to make use of custom regex, make custom_regexs a list of tuples
         # The first entry in the tuple being the `find` and the 2nd the `replace` strings
         self.custom_regexs = None
+        self.use_default_regex = True
 
-        self.d_filepath = Path('./dialogue.txt')
+        self.d_filepath = f"{Path('./dialogue.txt')}"
         self.ss_folderpath = f"{Path('./screenshots/')}{sep}"
         self.header_interval_time = 300  # in seconds
         self.read_interval = 10
-        self.tesseract_filepath = Path('C:/Program Files/Tesseract-OCR/tesseract.exe')
+        self.tesseract_filepath = f"{Path('C:/Program Files/Tesseract-OCR/tesseract.exe')}"
 
         # Load user configs
         self.load_configs()
@@ -84,9 +85,10 @@ class ChatFrame:
                 self.ss_folderpath = f"{Path(config['screenshot_folderpath'])}{sep}"
                 self.header_interval_time = config['time_header_interval']
                 self.read_interval = config['read_interval']
-                self.tesseract_filepath = Path(config['tesseract_filepath'])
+                self.tesseract_filepath = f"{Path(config['tesseract_filepath'])}"
                 self.confidence_level = config['confidence_level']
                 self.custom_regexs = config['user_regex']
+                self.use_default_regex = config['use_default_regex']
 
                 # Give explicit path to tesseract exe
                 pytesseract.pytesseract.tesseract_cmd = self.tesseract_filepath
@@ -327,7 +329,7 @@ class ChatFrame:
             self.image = self.take_screenshot()
 
             self.extract_text()
-            out = clean(self.raw_text, use_defaults=True, custom=self.custom_regexs)
+            out = clean(self.raw_text, use_defaults=self.use_default_regex, custom=self.custom_regexs)
 
             if out is False:
                 out = self.raw_text
