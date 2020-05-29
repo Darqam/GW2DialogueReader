@@ -9,7 +9,7 @@ def clean(content, use_defaults=True, custom=None, character_name=None):
     if use_defaults:
 
         # Remove newline when the string after \n doesn't have a `:` character
-        clean_content = re.sub(r"\r?\n(?!.+:)([^\n].+)", r" \1", clean_content)
+        clean_content = re.sub(r"\n(?!.+:)([^\n].+)", r" \1", clean_content)
 
         # regex for time in 12h or 24h
         # regex for channel tag [m], [s], etc
