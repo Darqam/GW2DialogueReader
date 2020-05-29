@@ -12,18 +12,30 @@ import pygetwindow as gw
 import cv2
 from pynput import mouse, keyboard
 
+import yaml
+from pathlib import Path
+
 import time
 import datetime
-from os import path, mkdir
+from os import path, mkdir, sep
 import sys
 
 # Custom module
 from clean_output import clean
 
-# Give explicit path to tesseract exe
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+
+# Tiny bit of work to allow loading tupples from yaml
+class PrettySafeLoader(yaml.SafeLoader):
+    def construct_python_tuple(self, node):
+        return tuple(self.construct_sequence(node))
 
 
+PrettySafeLoader.add_constructor(
+    u'tag:yaml.org,2002:python/tuple',
+    PrettySafeLoader.construct_python_tuple)
+
+
+# Now to the core of it all
 class ChatFrame:
     """
     Class describing the virtual GW2 chatbox position, image, and content
@@ -51,14 +63,40 @@ class ChatFrame:
         # The first entry in the tuple being the `find` and the 2nd the `replace` strings
         self.custom_regexs = None
 
-        self.d_filepath = './dialogue.txt'
-        self.ss_folderpath = './screenshots/'
+        self.d_filepath = Path('./dialogue.txt')
+        self.ss_folderpath = f"{Path('./screenshots/')}{sep}"
         self.header_interval_time = 300  # in seconds
+        self.read_interval = 10
+        self.tesseract_filepath = Path('C:/Program Files/Tesseract-OCR/tesseract.exe')
 
+        # Load user configs
+        self.load_configs()
         # Make sure we have a valid screenshots folder
         self.verify_folder()
         # Make a new entry in the dialogue txt file
         self.new_file_entry()
+
+    def load_configs(self):
+        with open(Path("./config.yaml"), 'r') as stream:
+            try:
+                config = yaml.load(stream, Loader=PrettySafeLoader)
+                self.d_filepath = Path(config['dialogue_filepath'])
+                self.ss_folderpath = f"{Path(config['screenshot_folderpath'])}{sep}"
+                self.header_interval_time = config['time_header_interval']
+                self.read_interval = config['read_interval']
+                self.tesseract_filepath = Path(config['tesseract_filepath'])
+                self.confidence_level = config['confidence_level']
+                self.custom_regexs = config['user_regex']
+
+                # Give explicit path to tesseract exe
+                pytesseract.pytesseract.tesseract_cmd = self.tesseract_filepath
+            except yaml.YAMLError as exc:
+                print(exc)
+                pyautogui.alert(text='There was an error loading config.yaml, please ensure it is filled out '
+                                     'properly, aborting.',
+                                title='Error',
+                                button='OK')
+                sys.exit(1)
 
     def new_file_entry(self):
         """Adds a datetime header to the dialogue file."""
@@ -73,10 +111,10 @@ class ChatFrame:
             try:
                 mkdir(self.ss_folderpath)
             except Exception as err:
+                print(err)
                 pyautogui.alert(text='Could not create or find the folder {0}, aborting.'.format(self.ss_folderpath),
                                 title='Error',
                                 button='OK')
-                print(err)
                 sys.exit(1)
 
     def reset_frame(self):
@@ -143,6 +181,10 @@ class ChatFrame:
             pyautogui.alert(text='Could not find a window titled "Guild Wars 2", aborting.', title='Error',
                             button='OK')
             sys.exit(1)
+
+        # wait 0.5 seconds for the window to actually be in frame
+        # failing to do this can result in just a black box
+        time.sleep(0.5)
 
         bl = pyautogui.locateOnScreen('./reference/bl_corner.png', confidence=self.confidence_level)
         tr = pyautogui.locateOnScreen('./reference/tr_corner.png', confidence=self.confidence_level)
