@@ -11,6 +11,8 @@ import pyautogui
 import pygetwindow as gw
 import cv2
 from pynput import mouse, keyboard
+import tkinter as tk
+import tkinter.messagebox as messagebox
 
 import yaml
 from pathlib import Path
@@ -22,6 +24,7 @@ import sys
 
 # Custom module
 from clean_output import clean
+from hotkey_listener import Hotkey
 
 
 # Tiny bit of work to allow loading tupples from yaml
@@ -33,6 +36,26 @@ class PrettySafeLoader(yaml.SafeLoader):
 PrettySafeLoader.add_constructor(
     u'tag:yaml.org,2002:python/tuple',
     PrettySafeLoader.construct_python_tuple)
+
+
+def min_max(title):
+    """
+    Function used to "nicely force" the given window into view above the game window
+    :param title: title of the window to bring up
+    """
+    try:
+        window = gw.getWindowsWithTitle(title)[0]
+        if window:
+            w_width = window.width
+            w_height = window.height
+            w_top = window.top
+            w_left = window.left
+            window.minimize()
+            window.maximize()
+            window.resizeTo(w_width, w_height)
+            window.moveTo(w_left, w_top)
+    except gw.PyGetWindowException as e:
+        print(e)
 
 
 # Now to the core of it all
@@ -47,6 +70,8 @@ class ChatFrame:
         self.y2 = 0
         self.width = 0
         self.height = 0
+
+        self.paused = False
 
         self.valid_frame = False
         self.confidence_level = 0.8
@@ -63,8 +88,10 @@ class ChatFrame:
         # The first entry in the tuple being the `find` and the 2nd the `replace` strings
         self.custom_regexs = None
         self.use_default_regex = True
+        self.hotkey = 'k'
 
         self.d_filepath = f"{Path('./dialogue.txt')}"
+        self.raw_dial_filepath = f"{Path('./raw_dialogue.txt')}"
         self.ss_folderpath = f"{Path('./screenshots/')}{sep}"
         self.header_interval_time = 300  # in seconds
         self.read_interval = 10
@@ -74,14 +101,13 @@ class ChatFrame:
         self.load_configs()
         # Make sure we have a valid screenshots folder
         self.verify_folder()
-        # Make a new entry in the dialogue txt file
-        self.new_file_entry()
 
     def load_configs(self):
         with open(Path("./config.yaml"), 'r') as stream:
             try:
                 config = yaml.load(stream, Loader=PrettySafeLoader)
                 self.d_filepath = Path(config['dialogue_filepath'])
+                self.raw_dial_filepath = Path(config['raw_dialogue_filepath'])
                 self.ss_folderpath = f"{Path(config['screenshot_folderpath'])}{sep}"
                 self.header_interval_time = config['time_header_interval']
                 self.read_interval = config['read_interval']
@@ -89,6 +115,7 @@ class ChatFrame:
                 self.confidence_level = config['confidence_level']
                 self.custom_regexs = config['user_regex']
                 self.use_default_regex = config['use_default_regex']
+                self.hotkey = config['hotkey']
 
                 # Give explicit path to tesseract exe
                 pytesseract.pytesseract.tesseract_cmd = self.tesseract_filepath
@@ -99,13 +126,6 @@ class ChatFrame:
                                 title='Error',
                                 button='OK')
                 sys.exit(1)
-
-    def new_file_entry(self):
-        """Adds a datetime header to the dialogue file."""
-        with open(self.d_filepath, 'a') as file:
-            cur_date = datetime.datetime.fromtimestamp(time.time())
-            file.write('\n\n---{0}---\n'.format(cur_date.strftime('%Y-%m-%d %H:%M:%S')))
-            self.last_entry_time = time.time()
 
     def verify_folder(self):
         """Verifies that screenshot folder exists, if not attempts to create it."""
@@ -243,31 +263,29 @@ class ChatFrame:
         if self.image:
             while True:
                 try:
+                    # Convert the screenshot to something CV2 can work with
                     open_cv_image = np.array(self.image)
                     # Convert RGB to BGR
                     open_cv_image = open_cv_image[:, :, ::-1].copy()
+                    # Show said image
                     cv2.imshow('image', open_cv_image)
 
                     # Do some funky stuff to make the image popup above GW2 window
-                    try:
-                        window = gw.getWindowsWithTitle("image")[0]
-                        if window:
-                            w_width = window.width
-                            w_height = window.height
-                            window.minimize()
-                            window.maximize()
-                            window.resizeTo(w_width, w_height)
-                    except gw.PyGetWindowException as e:
-                        print(e)
-                except SystemError as e:
-                    print('Improper frame format.', e)
+                    min_max("image")
+                except SystemError as err:
+                    print('Improper frame format.', err)
                     if not self.auto_frame():
                         self.get_frame()
                     self.image = self.take_screenshot()
-
+                except IndexError as err:
+                    print(err)
+                    pyautogui.alert(text='Unexpected error on frame conversion, please restart program.',
+                                    title='Error', button='OK')
+                    sys.exit(1)
                 response = pyautogui.confirm(text='Does this image show the full text area of the chat box',
                                              title='Please confirm',
                                              buttons=['Yes', 'Retry auto', 'Try Manual', 'Quit'])
+                # Remove the window showing the screenshot
                 cv2.destroyAllWindows()
                 if response == 'Yes':
                     return True
@@ -325,72 +343,117 @@ class ChatFrame:
         If not, continue on, if yes then print to file and save screenshot
         :param timer: The delay between read intervals (in seconds)
         """
+
         while True:
-            self.image = self.take_screenshot()
+            # If we are in paused mode, run the timer and keep waiting
+            if self.paused is False:
+                self.image = self.take_screenshot()
 
-            self.extract_text()
-            out = clean(self.raw_text, use_defaults=self.use_default_regex, custom=self.custom_regexs)
+                self.extract_text()
 
-            if out is False:
-                out = self.raw_text
+                out = clean(self.raw_text, use_defaults=self.use_default_regex, custom=self.custom_regexs)
 
-            lines = out.split('\n')
-            last_line = lines[-1]
-            new_lines = []
+                if out is False:
+                    out = self.raw_text
 
-            if self.last_content is None:
-                # Write text to file
-                # save screenshot
-                self.print_to_file(lines)
-                self.save_screenshot()
+                raw_lines = self.raw_text.split('\n')
+                lines = out.split('\n')
+                last_line = lines[-1]
+                new_lines = []
+                new_raw_lines = []
 
-                self.last_line = last_line
-                self.last_content = '\n'.join(lines)
-            elif last_line != self.last_line:
-                # Loop over new lines from the end until something matches
-                # Remove everything from new lines from where the first match occurs
-                # (i.e this ignores already parsed text from previous screenshots)
-                for idx, line in enumerate(reversed(lines)):
-                    if line not in self.last_content:
-                        continue
-                    else:
-                        new_lines = lines[len(lines) - idx:len(lines)]
-                        break
-
-                if len(new_lines) > 0:
-                    # First check if it's been more than the requested header delay
-                    if time.time() - self.last_entry_time > self.header_interval_time:
-                        # Add a new time header
-                        self.new_file_entry()
-
-                    self.print_to_file(new_lines)
+                if self.last_content is None:
+                    # Write text to file
+                    # save screenshot
+                    self.print_to_file(self.raw_dial_filepath, raw_lines)
+                    self.print_to_file(self.d_filepath, lines)
                     self.save_screenshot()
 
                     self.last_line = last_line
-                    self.last_content = '\n'.join(new_lines)
+                    self.last_content = '\n'.join(lines)
+                elif last_line != self.last_line:
+                    # Loop over new lines from the end until something matches
+                    # Remove everything from new lines from where the first match occurs
+                    # (i.e this ignores already parsed text from previous screenshots)
+                    for idx, line in enumerate(reversed(lines)):
+                        if line not in self.last_content:
+                            continue
+                        else:
+                            new_lines = lines[len(lines) - idx:len(lines)]
+                            new_raw_lines = raw_lines[len(raw_lines) - idx:len(raw_lines)]
+                            break
 
+                    if len(new_lines) > 0:
+                        self.print_to_file(self.raw_dial_filepath, new_raw_lines)
+                        self.print_to_file(self.d_filepath, new_lines)
+                        self.save_screenshot()
+
+                        self.last_line = last_line
+                        self.last_content = '\n'.join(new_lines)
             # Sleep for 'timer' seconds since the last loop iteration
             # Note that this isn't a true "consistent" delay since it depends on processing time
             # I, however, rather keep it as such since a) meh, and b) prevents possible double up
             time.sleep(timer)
-
-    def print_to_file(self, lines=None):
-        """
-        Will print the provided lines to the appropriate dialogue text file
-        :param lines: a list of strings, text to be written to the file
-        """
-        if lines is None:
-            return
-
-        with open(self.d_filepath, 'a') as file:
-            print('Adding new text to file.')
-            file.write('\n'.join(lines))
 
     def save_screenshot(self):
         """Saves the screenshot of the chat frame with a datetime filename."""
         cur_date = datetime.datetime.fromtimestamp(time.time())
         filename = '{0}{1}.jpg'.format(self.ss_folderpath, cur_date.strftime('%Y-%m-%d_%H-%M-%S'))
         self.image.save(filename)
+
+    def print_to_file(self, filepath, lines=None):
+        """
+        Will print the provided lines to the appropriate dialogue text file
+        :param filepath: filepath to the textfile to print out
+        :param lines: a list of strings, text to be written to the file
+        """
+        if lines is None:
+            return
+
+        header = ''
+        # First check if it's been more than the requested header delay
+        if self.last_entry_time is None or time.time() - self.last_entry_time > self.header_interval_time:
+            # Add a new time header
+            cur_date = datetime.datetime.fromtimestamp(time.time())
+            header = '\n\n---{0}---\n'.format(cur_date.strftime('%Y-%m-%d %H:%M:%S'))
+            self.last_entry_time = time.time()
+
+        with open(filepath, 'a') as file:
+            print('Adding new text to file {0}.'.format(filepath))
+            file.write(header + '\n'.join(lines))
+
+    # These next functions are for hotkey monitoring
+    def toggle_pause(self):
+        """
+        Function called when the hotkey combination is triggered
+        """
+        if self.paused is True:
+            self.send_alert('Transcribing resumed, hit hotkey again to pause.',
+                            'Resuming...')
+            self.paused = False
+        elif self.paused is False:
+            self.send_alert('Transcribing paused, hit hotkey again to resume.',
+                            'Paused')
+            self.paused = True
+
+    @staticmethod
+    def send_alert(text, title):
+        """
+        Custom little function to create alert boxes.
+        At present time used to bypass the issue of threading with pyautogui
+        :param text: The text of the alert box
+        :param title: Title of the alert box
+        """
+        root = tk.Tk()
+        root.title(title)
+        label = tk.Label(root, text=text)
+        label.pack(side="top", fill="both", expand=True, padx=50, pady=5)
+        button = tk.Button(root, text="OK", width=10,
+                           command=lambda: root.destroy())
+        button.pack(side="bottom", fill="none", expand=True, pady=10)
+        root.update()
+        min_max(title)
+        root.wait_window()
 
 
 myFrame = ChatFrame()
@@ -406,7 +469,14 @@ if myFrame.image:
                       buttons=['*push the button*'])
     myFrame.extract_text()
 
-    #stop_listener = keyboard.Listener()
+    # Declare class (see hotkey_listener.py)
+    # Startup the listener
+    myHotkey = Hotkey(myFrame)
+    key_listener = keyboard.Listener(
+        on_press=myHotkey.on_press,
+        on_release=myHotkey.on_release
+    )
+    key_listener.start()
 
     myFrame.cycle_shots()
 else:
