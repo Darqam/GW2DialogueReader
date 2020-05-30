@@ -277,7 +277,11 @@ class ChatFrame:
                     if not self.auto_frame():
                         self.get_frame()
                     self.image = self.take_screenshot()
-
+                except IndexError as err:
+                    print(err)
+                    pyautogui.alert(text='Unexpected error on frame conversion, please restart program.',
+                                    title='Error', button='OK')
+                    sys.exit(1)
                 response = pyautogui.confirm(text='Does this image show the full text area of the chat box',
                                              title='Please confirm',
                                              buttons=['Yes', 'Retry auto', 'Try Manual', 'Quit'])
