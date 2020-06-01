@@ -60,13 +60,6 @@ class ChatFrame:
     Class describing the virtual GW2 chatbox position, image, and content
     """
     def __init__(self):
-        self.x1 = 0
-        self.y1 = 0
-        self.x2 = 0
-        self.y2 = 0
-        self.width = 0
-        self.height = 0
-
         self.paused = False
 
         self.valid_frame = False
@@ -80,23 +73,12 @@ class ChatFrame:
         self.last_line = None
         self.last_entry_time = None
 
-        # If the user wants to make use of custom regex, make custom_regexs a list of tuples
-        # The first entry in the tuple being the `find` and the 2nd the `replace` strings
-        self.custom_regexs = None
-        self.use_default_regex = True
-        self.hotkey = 'k'
-
-        self.d_filepath = f"{Path('./dialogue.txt')}"
-        self.raw_dial_filepath = f"{Path('./raw_dialogue.txt')}"
-        self.ss_folderpath = f"{Path('./screenshots/')}{sep}"
-        self.header_interval_time = 300  # in seconds
-        self.read_interval = 10
-        self.tesseract_filepath = f"{Path('C:/Program Files/Tesseract-OCR/tesseract.exe')}"
-
         # Load user configs
         self.load_configs()
         # Make sure we have a valid screenshots folder
         self.verify_folder()
+        # Set frame to 0
+        self.reset_frame()
 
     def load_configs(self):
         with open(Path("./config.yaml"), 'r') as stream:
@@ -414,6 +396,7 @@ class ChatFrame:
         Will print the provided lines to the appropriate dialogue text file
         :param filepath: filepath to the textfile to print out
         :param lines: a list of strings, text to be written to the file
+        :param header: the datetime header (if needed) for these lines
         """
         if lines is None:
             return
