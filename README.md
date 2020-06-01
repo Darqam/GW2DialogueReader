@@ -39,6 +39,6 @@ Additionally you will need to install [tesseract](https://github.com/UB-Mannheim
 
 Todo
 -----
-* Make a nice way to pause and stop the program through keyboard shortcuts (user customizable)
-* Do some more text parsing
-    * Probably move it into another module and allow for user regex additions
+* Fix bug where program will crash during auto frame capture
+* Offer various thresholding options if people want to play with that
+* Fix removal of excessive newlines
