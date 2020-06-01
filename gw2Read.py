@@ -365,8 +365,9 @@ class ChatFrame:
                 if self.last_content is None:
                     # Write text to file
                     # save screenshot
-                    self.print_to_file(self.raw_dial_filepath, raw_lines)
-                    self.print_to_file(self.d_filepath, lines)
+                    header = self.generate_header()
+                    self.print_to_file(self.raw_dial_filepath, raw_lines, header)
+                    self.print_to_file(self.d_filepath, lines, header)
                     self.save_screenshot()
 
                     self.last_line = last_line
@@ -384,8 +385,9 @@ class ChatFrame:
                             break
 
                     if len(new_lines) > 0:
-                        self.print_to_file(self.raw_dial_filepath, new_raw_lines)
-                        self.print_to_file(self.d_filepath, new_lines)
+                        header = self.generate_header()
+                        self.print_to_file(self.raw_dial_filepath, new_raw_lines, header)
+                        self.print_to_file(self.d_filepath, new_lines, header)
                         self.save_screenshot()
 
                         self.last_line = last_line
@@ -401,7 +403,17 @@ class ChatFrame:
         filename = '{0}{1}.jpg'.format(self.ss_folderpath, cur_date.strftime('%Y-%m-%d_%H-%M-%S'))
         self.image.save(filename)
 
-    def print_to_file(self, filepath, lines=None):
+    def generate_header(self):
+        # First check if it's been more than the requested header delay
+        header = ''
+        if self.last_entry_time is None or time.time() - self.last_entry_time > self.header_interval_time:
+            # Add a new time header
+            cur_date = datetime.datetime.fromtimestamp(time.time())
+            header = '\n\n---{0}---\n'.format(cur_date.strftime('%Y-%m-%d %H:%M:%S'))
+            self.last_entry_time = time.time()
+        return header
+
+    def print_to_file(self, filepath, lines=None, header=''):
         """
         Will print the provided lines to the appropriate dialogue text file
         :param filepath: filepath to the textfile to print out
@@ -409,14 +421,6 @@ class ChatFrame:
         """
         if lines is None:
             return
-
-        header = ''
-        # First check if it's been more than the requested header delay
-        if self.last_entry_time is None or time.time() - self.last_entry_time > self.header_interval_time:
-            # Add a new time header
-            cur_date = datetime.datetime.fromtimestamp(time.time())
-            header = '\n\n---{0}---\n'.format(cur_date.strftime('%Y-%m-%d %H:%M:%S'))
-            self.last_entry_time = time.time()
 
         with open(filepath, 'a') as file:
             print('Adding new text to file {0}.'.format(filepath))
