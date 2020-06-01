@@ -3,10 +3,6 @@ import skimage
 from skimage.filters import threshold_otsu
 import numpy as np
 
-# These imports are explicit purely for exe purposes
-import numpy.random.common
-import numpy.random.bounded_integers
-
 import pyautogui
 import pygetwindow as gw
 import cv2
